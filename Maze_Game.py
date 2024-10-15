@@ -38,12 +38,13 @@ class MazeGame:
             try:
                 n, m = map(int, file.readline().strip().split())
                 self.start = tuple(map(int, file.readline().strip().split()))
+                print(self.start)
                 self.goal = tuple(map(int, file.readline().strip().split()))
                 self.obstacles = []
 
                 for line in file:
                     x, y = map(int, line.strip().split())
-                    self.obstacles.append((y - 1, x - 1))  # Adjusting for 0-indexing
+                    self.obstacles.append((y, x))  # Adjusting for 0-indexing
 
                 self.grid_size = (n, m)
 
@@ -116,8 +117,8 @@ class MazeGame:
     def create_maze(self):
         n = int(self.n_entry.get())
         m = int(self.m_entry.get())
-        self.start = (int(self.start_x_entry.get()) - 1, int(self.start_y_entry.get()) - 1)
-        self.goal = (int(self.goal_x_entry.get()) - 1, int(self.goal_y_entry.get()) - 1)
+        self.start = (int(self.start_x_entry.get()), int(self.start_y_entry.get()))
+        self.goal = (int(self.goal_x_entry.get()) , int(self.goal_y_entry.get()))
 
         self.grid_size = (n, m)
         self.obstacles = []
@@ -149,8 +150,13 @@ class MazeGame:
                 x0, y0 = j * self.cell_size, i * self.cell_size
                 x1, y1 = x0 + self.cell_size, y0 + self.cell_size
                 self.canvas.create_rectangle(x0, y0, x1, y1, outline="black", fill="white")
+            
+            # Draw row and column numbers
+                self.canvas.create_text(x0 + self.cell_size // 2, y0 + self.cell_size // 2, 
+                                    text=f"({i},{j})", fill="black", font=("Arial", 8))
 
         self.show_start_goal()
+
 
     def show_start_goal(self):
         start_x, start_y = self.start[1] * self.cell_size, self.start[0] * self.cell_size
@@ -242,7 +248,11 @@ class MazeGame:
             j = p[2]
             closed_list[i][j] = True
 
-            directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # 4-directional movement
+            directions = [
+    (0, 1), (0, -1), (1, 0), (-1, 0),  # Vertical and horizontal
+    (1, 1), (1, -1), (-1, 1), (-1, -1)  # Diagonal movements
+]
+
             for dir in directions:
                 new_i = i + dir[0]
                 new_j = j + dir[1]
@@ -255,7 +265,7 @@ class MazeGame:
                         self.draw_cost_grid(cell_details)  # Draw cost grid before returning
                         return self.trace_path(cell_details, dest)
 
-                    g_new = cell_details[i][j].g + 1.0
+                    g_new = cell_details[i][j].g + (1.414 if (dir[0] != 0 and dir[1] != 0) else 1.0)
                     h_manhattan = abs(new_i - dest[0]) + abs(new_j - dest[1])
                     h_diagonal = max(abs(new_i - dest[0]), abs(new_j - dest[1]))
                     h_euclidean = math.sqrt((new_i - dest[0]) ** 2 + (new_j - dest[1]) ** 2)
