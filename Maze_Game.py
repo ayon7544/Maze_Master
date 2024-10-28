@@ -127,7 +127,7 @@ class MazeGame:
         self.canvas = tk.Canvas(self.master, width=600, height=600)
         self.canvas.pack(side=tk.LEFT)  # Pack canvas to the left
         self.canvas.bind("<Button-1>", self.set_obstacle)
-
+        
         self.draw_grid()
         self.hide_input_fields()
 
