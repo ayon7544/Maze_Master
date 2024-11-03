@@ -38,7 +38,6 @@ class MazeGame:
             try:
                 n, m = map(int, file.readline().strip().split())
                 self.start = tuple(map(int, file.readline().strip().split()))
-                print(self.start)
                 self.goal = tuple(map(int, file.readline().strip().split()))
                 self.obstacles = []
 
@@ -56,7 +55,6 @@ class MazeGame:
                 self.hide_input_fields()
                 self.create_cost_canvas()
                 self.draw_obstacles()
-
                 self.submit_button.config(state=tk.NORMAL)
                 self.restart_button.config(state=tk.NORMAL)
 
@@ -170,15 +168,22 @@ class MazeGame:
         self.cost_frame.pack(side=tk.LEFT)  # Pack to the left of the main canvas
 
         # Create a canvas
-        self.cost_canvas = tk.Canvas(self.cost_frame, width=900, height=1000)  # Adjust width and height as needed
+        self.cost_canvas = tk.Canvas(self.cost_frame, width=800, height=800)  # Adjust width and height as needed
         self.cost_canvas.pack(side=tk.RIGHT)
 
         # Create a scrollbar
-        self.scrollbar = tk.Scrollbar(self.cost_frame, orient="vertical", command=self.cost_canvas.yview)
-        self.scrollbar.pack(side=tk.LEFT, fill='y')
+        self.yscrollbar = tk.Scrollbar(self.cost_frame, orient="vertical", command=self.cost_canvas.yview)
+        self.yscrollbar.pack(side=tk.LEFT, fill='y')
 
         # Configure canvas to use scrollbar
-        self.cost_canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.cost_canvas.configure(yscrollcommand=self.yscrollbar.set)
+        
+        # Create a scrollbar
+        self.xscrollbar = tk.Scrollbar(self.cost_frame, orient="horizontal", command=self.cost_canvas.xview)
+        self.xscrollbar.pack(side=tk.TOP, fill='x')
+
+        # Configure canvas to use scrollbar
+        self.cost_canvas.configure(xscrollcommand=self.xscrollbar.set)
 
         # Create an additional frame inside the canvas for the cost grid
         self.cost_grid_frame = tk.Frame(self.cost_canvas)
@@ -194,14 +199,16 @@ class MazeGame:
         for i in range(self.grid_size[0]):
             for j in range(self.grid_size[1]):
                 g_value = cell_details[i][j].g
-                h_value = cell_details[i][j].h
-                f_value = cell_details[i][j].f
+                h_manhattan = abs(i - self.goal[0]) + abs(j - self.goal[1])
+                h_diagonal = max(abs(i - self.goal[0]), abs(j - self.goal[1]))
+                f_manhattan = g_value + h_manhattan
+                f_diagonal = g_value + h_diagonal
 
                 # Create a frame for each cell
-                cell_frame = tk.Frame(self.cost_grid_frame, width=100, height=60, relief='solid', borderwidth=1)
+                cell_frame = tk.Frame(self.cost_grid_frame, width=200, height=100, relief='solid', borderwidth=1)
                 cell_frame.grid(row=i, column=j, padx=2, pady=2)
 
-                label = tk.Label(cell_frame, text=f"g: {g_value:.1f}\nh: {h_value:.1f}\nf: {f_value:.1f}", anchor='center')
+                label = tk.Label(cell_frame, text=f"g(n): {g_value:.1f}\n[man] h(n): {h_manhattan:.1f}\n[man] f(n): {f_manhattan:.1f}\n[dia] h(n): {h_diagonal:.1f}\n[dia] f(n): {f_diagonal:.1f}", anchor='center')
                 label.pack(expand=True)
 
     def set_obstacle(self, event):
@@ -265,13 +272,12 @@ class MazeGame:
                         self.draw_cost_grid(cell_details)  # Draw cost grid before returning
                         return self.trace_path(cell_details, dest)
 
-                    g_new = cell_details[i][j].g + (1.414 if (dir[0] != 0 and dir[1] != 0) else 1.0)
+                    g_new = math.sqrt((new_i - dest[0]) ** 2 + (new_j - dest[1]) ** 2)
                     h_manhattan = abs(new_i - dest[0]) + abs(new_j - dest[1])
                     h_diagonal = max(abs(new_i - dest[0]), abs(new_j - dest[1]))
-                    h_euclidean = math.sqrt((new_i - dest[0]) ** 2 + (new_j - dest[1]) ** 2)
 
                     # Choosing the minimum h value
-                    h_new = min(h_manhattan, h_diagonal, h_euclidean)
+                    h_new = min(h_manhattan, h_diagonal)
                     
                     f_new = g_new + h_new
 
@@ -298,17 +304,26 @@ class MazeGame:
 
     def trace_path(self, cell_details, dest):
         path = []
+        total_cost = 0  # Initialize total cost to zero
         row, col = dest
 
         while not (cell_details[row][col].parent_i == row and cell_details[row][col].parent_j == col):
             path.append((row, col))
+            total_cost += cell_details[row][col].h  # Add the g cost of the current cell
             temp_row = cell_details[row][col].parent_i
             temp_col = cell_details[row][col].parent_j
             row, col = temp_row, temp_col
 
-        path.append((row, col))
+    # Add the starting cell's g cost
+        total_cost += cell_details[row][col].g
+        path.append((row, col))  # Include the starting cell
         path.reverse()
+
+    # Optionally display the total cost in the GUI
+        self.display_message(f"Path: {path}\nTotal Path Cost: {total_cost:.1f}")
+
         self.animate_path(path)
+
 
     def animate_path(self, path):
         for step in path:
@@ -327,26 +342,31 @@ class MazeGame:
         head_x = x + self.cell_size // 2
         head_y = y + self.cell_size // 2 - head_radius
 
-        # Draw head
+    # Draw head
         self.canvas.create_oval(head_x - head_radius, head_y - head_radius,
-                                head_x + head_radius, head_y + head_radius, fill="black")
-        
-        # Draw body
+                             head_x + head_radius, head_y + head_radius, fill="black")
+    
+    # Draw body
         body_length = head_radius * 2
-        self.canvas.create_line(head_x, head_y, head_x, head_y + body_length, fill="black", width=3)
-        
-        # Draw arms
-        arm_length = 20
-        self.canvas.create_line(head_x, head_y + 5, head_x - arm_length, head_y + 10, fill="black", width=3)  # Left arm
-        self.canvas.create_line(head_x, head_y + 5, head_x + arm_length, head_y + 10, fill="black", width=3)  # Right arm
-        
+        self.canvas.create_line(head_x, head_y, head_x, head_y + body_length, fill="black")
+
+    # Draw arms
+        arm_length = head_radius * 1.5
+        self.canvas.create_line(head_x, head_y + head_radius, head_x - arm_length, head_y + head_radius, fill="black")
+        self.canvas.create_line(head_x, head_y + head_radius, head_x + arm_length, head_y + head_radius, fill="black")
+
         # Draw legs
-        self.canvas.create_line(head_x, head_y + body_length, head_x - arm_length // 2, head_y + body_length + arm_length, fill="black", width=3)  # Left leg
-        self.canvas.create_line(head_x, head_y + body_length, head_x + arm_length // 2, head_y + body_length + arm_length, fill="black", width=3)  # Right leg
+        leg_length = body_length * 1.5
+        self.canvas.create_line(head_x, head_y + body_length, head_x - head_radius, head_y + body_length + leg_length,  fill="black")
+        self.canvas.create_line(head_x, head_y + body_length, head_x + head_radius, head_y + body_length + leg_length,  fill="black")
+
 
     def find_path(self):
+        start_time= time.time()
         grid = [[1 if (i, j) not in self.obstacles else 0 for j in range(self.grid_size[1])] for i in range(self.grid_size[0])]
         self.a_star_search(grid, self.start, self.goal)
+        end_time=time.time()
+        self.display_message(f'Time Taken By StickMan : {abs(start_time-end_time)}')
 
     def restart_game(self):
         self.canvas.destroy()
